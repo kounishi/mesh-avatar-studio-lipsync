@@ -39,6 +39,8 @@ export interface MeshAvatar {
   setOverlayOpacity(name: string, opacity: number): void;
   getExpression(): { name: LiveExpression; active: boolean };
   setTalkGain(gain: number): void;
+  /** Scales the head / body movement while idling (wandering and idle motions); 1 is the default, 0.5 halves it. Gaze, blinks and talking nods are unchanged. */
+  setIdleGain(gain: number): void;
   play(id: string): void;
   speakKana(text: string, options?: { speed?: number; loop?: boolean }): void;
   holdMouth(vowel: 'a' | 'i' | 'u' | 'e' | 'o' | 'n'): void;

@@ -264,6 +264,8 @@ export async function createMeshAvatarImpl(canvas, options) {
     getExpression() { return { name: expression.name, active: expression.active }; },
     /** How much the head moves with the voice while speaking (1 = default, calmer below). */
     setTalkGain(g) { motion.talkGain = Math.max(0, Number(g) || 0); },
+    /** Head / body movement while idling (wander and idle motions) multiplier (1 = default). */
+    setIdleGain(g) { const v = Number(g); motion.idleGain = Number.isFinite(v) ? Math.max(0, v) : 1; },
     /** Play a motion or idle motion by id (see `motions`). */
     play(id) { if (motion.hasMotion(id)) motion.playMotion(id); },
     /** Move the mouth through the vowels of kana text (no audio; for previews). */

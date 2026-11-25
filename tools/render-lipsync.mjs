@@ -26,6 +26,8 @@ const USAGE = `Usage: npm run render-lipsync -- <project> <audio> [options]
   --seed <n>          seed for blinks and idle motion (default 1)
   --no-idle-motion    no small idle motions (doze, sigh, ...); blinks and reactions stay
   --calm              no idle or reaction motions; only sway, breathing and blinks
+  --idle-gain <n>     head / body movement while idling (wander, idle motions); 0.5 halves
+                      it (default 1). Talking nods, gaze and blinks are unchanged
   --no-half-eyes      never show the half-closed eye drawing (eyes are open or closed)
   --no-audio          do not put the audio into the video file
   --timeline <csv>    timing table from tools/speaker-timeline.py (line,speaker,start,end,text);
@@ -38,7 +40,7 @@ const USAGE = `Usage: npm run render-lipsync -- <project> <audio> [options]
   --overlay-fade <sec>  fade time when an overlay appears and disappears (default 0.3)`;
 
 function parseArgs(argv) {
-  const opts = { format: 'prores', size: 1080, fps: 30, gain: 1, hold: 0.4, start: 0, duration: null, seed: 1, audio: true, expression: null, out: null, idleMotion: true, reactions: true, timeline: null, speaker: null, margin: 0.1, halfEyes: true, overlays: [], overlayFade: 0.3 };
+  const opts = { format: 'prores', size: 1080, fps: 30, gain: 1, hold: 0.4, start: 0, duration: null, seed: 1, audio: true, expression: null, out: null, idleMotion: true, reactions: true, timeline: null, speaker: null, margin: 0.1, halfEyes: true, overlays: [], overlayFade: 0.3, idleGain: 1 };
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -59,6 +61,7 @@ function parseArgs(argv) {
     else if (a === '--no-half-eyes') opts.halfEyes = false;
     else if (a === '--no-idle-motion') opts.idleMotion = false;
     else if (a === '--calm') { opts.idleMotion = false; opts.reactions = false; }
+    else if (a === '--idle-gain') opts.idleGain = num(0);
     else if (a === '--timeline') opts.timeline = value();
     else if (a === '--speaker') opts.speaker = value();
     else if (a === '--margin') opts.margin = num(0);
@@ -218,7 +221,7 @@ async function main() {
       const canvas = document.getElementById('avatar');
       canvas.style.width = `${opts.size}px`; canvas.style.height = `${opts.size}px`;
       const av = await createMeshAvatar(canvas, { rig, assets, manual: true, halfEyes: opts.halfEyes, ...(lipSync ? { lipSync } : {}) });
-      av.setAutoIdle(opts.idleMotion); av.setAutoMotion(opts.reactions);
+      av.setAutoIdle(opts.idleMotion); av.setAutoMotion(opts.reactions); av.setIdleGain(opts.idleGain);
       if (opts.expression) av.setExpression(opts.expression);
       av.advance(1, 60); // settle hair physics before the first frame
       // Overlay opacity per frame: fades in at the start of each range and out at its end.

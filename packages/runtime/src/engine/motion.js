@@ -91,6 +91,7 @@ export class Motion {
     this.lipHold = null;
     this.emotionUntil = 0;         // when the emotion face goes back to normal
     this.talkGain = 1;             // how much the head moves along with the voice
+    this.idleGain = 1;             // how much the head / body wander and move in idle motions
     this.play = null;              // { id, t } of the motion being played
     this.autoMotion = true;        // "auto idle" plays a reaction motion now and then
     this.nextAuto = 14;
@@ -244,13 +245,14 @@ export class Motion {
       Object.assign(T, this.manual);
     } else if (this.mode === 'auto') {
       // wandering plus following the gaze: the eyes jump first, the head turns after them
-      T.angleX = fbm(t * 0.18, 1) * 10 + this.gaze.x * 11;
-      T.angleY = fbm(t * 0.15, 2) * 6 - 1 + this.gaze.y * 7;
-      T.angleZ = fbm(t * 0.12, 3) * 10;
-      T.bodyAngleX = fbm(t * 0.1, 4) * 5;
-      T.bodyAngleZ = fbm(t * 0.09, 5) * 4;
-      T.armAngle = fbm(t * 0.14, 6) * 5;
-      T.handAngle = fbm(t * 0.21, 7) * 5;
+      const ig = this.idleGain;
+      T.angleX = (fbm(t * 0.18, 1) * 10 + this.gaze.x * 11) * ig;
+      T.angleY = (fbm(t * 0.15, 2) * 6 - 1 + this.gaze.y * 7) * ig;
+      T.angleZ = fbm(t * 0.12, 3) * 10 * ig;
+      T.bodyAngleX = fbm(t * 0.1, 4) * 5 * ig;
+      T.bodyAngleZ = fbm(t * 0.09, 5) * 4 * ig;
+      T.armAngle = fbm(t * 0.14, 6) * 5 * ig;
+      T.handAngle = fbm(t * 0.21, 7) * 5 * ig;
       // glances
       if (t > this.gaze.next) {
         const r = Math.random();
@@ -307,7 +309,7 @@ export class Motion {
       else {
         M = {};
         for (const [id, keys] of Object.entries(def.tracks))
-          M[id] = sampleTrack(keys, this.play.t) * (def.idle && IDLE_SCALED.test(id) ? IDLE_GAIN.amp : 1);
+          M[id] = sampleTrack(keys, this.play.t) * (def.idle && IDLE_SCALED.test(id) ? IDLE_GAIN.amp * this.idleGain : 1);
         mw = sstep(0, 0.15, this.play.t) * (1 - sstep(def.dur - 0.25, def.dur, this.play.t));
         for (const [id, v] of Object.entries(M)) {
           if (ADDITIVE.has(id)) T[id] += v;
