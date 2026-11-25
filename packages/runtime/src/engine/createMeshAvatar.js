@@ -259,6 +259,8 @@ export async function createMeshAvatarImpl(canvas, options) {
     setExpression(name) { expression.set(name); },
     /** Show the named overlay layers (built/overlays/overlays.json) and hide the others. */
     setOverlays(names) { overlays?.set(names); },
+    /** Show one overlay layer at an opacity from 0 (hidden) to 1, e.g. to fade it in and out. */
+    setOverlayOpacity(name, value) { overlays?.opacity(name, value); },
     getExpression() { return { name: expression.name, active: expression.active }; },
     /** How much the head moves with the voice while speaking (1 = default, calmer below). */
     setTalkGain(g) { motion.talkGain = Math.max(0, Number(g) || 0); },

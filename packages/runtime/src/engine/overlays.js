@@ -56,7 +56,18 @@ export function createOverlayLayers(renderer, sheet, images, buildGrid, alphaOf,
     /** Shows the named overlays and hides the rest. Unknown names are ignored. */
     set(names) {
       const selected = new Set(names);
-      for (const [name, item] of items) item.layer.visible = selected.has(name);
+      for (const [name, item] of items) {
+        item.layer.visible = selected.has(name);
+        item.layer.alpha = 1;
+      }
+    },
+    /** Shows one overlay at the given opacity (0 hides it); for fading it in and out. */
+    opacity(name, value) {
+      const item = items.get(name);
+      if (!item) return;
+      const a = Math.min(1, Math.max(0, Number(value) || 0));
+      item.layer.alpha = a;
+      item.layer.visible = a > 0.001;
     },
     update(P, phys, deformBase, out) {
       for (const { mesh, weights, layer } of items.values()) {

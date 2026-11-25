@@ -35,6 +35,8 @@ export interface MeshAvatar {
   setExpression(name: LiveExpression): void;
   /** Show the named overlay layers from built/overlays/overlays.json and hide the rest; unknown names are ignored. */
   setOverlays(names: string[]): void;
+  /** Show one overlay layer at an opacity from 0 (hidden) to 1, e.g. to fade it in and out; other overlays are unchanged. */
+  setOverlayOpacity(name: string, opacity: number): void;
   getExpression(): { name: LiveExpression; active: boolean };
   setTalkGain(gain: number): void;
   play(id: string): void;

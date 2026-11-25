@@ -31,10 +31,14 @@ const USAGE = `Usage: npm run render-lipsync -- <project> <audio> [options]
   --timeline <csv>    timing table from tools/speaker-timeline.py (line,speaker,start,end,text);
                       with --speaker, the avatar talks only during that speaker's lines
   --speaker <name>    speaker name in the timeline (default: the project folder name)
-  --margin <sec>      widen each line by this much on both sides (default 0.1)`;
+  --margin <sec>      widen each line by this much on both sides (default 0.1)
+  --overlay <name>:<start>-<end>[,<start>-<end>...]
+                      show an overlay layer (built/overlays/) during these audio times, in
+                      seconds; repeatable. "--overlay <name>" alone shows it all the time
+  --overlay-fade <sec>  fade time when an overlay appears and disappears (default 0.3)`;
 
 function parseArgs(argv) {
-  const opts = { format: 'prores', size: 1080, fps: 30, gain: 1, hold: 0.4, start: 0, duration: null, seed: 1, audio: true, expression: null, out: null, idleMotion: true, reactions: true, timeline: null, speaker: null, margin: 0.1, halfEyes: true };
+  const opts = { format: 'prores', size: 1080, fps: 30, gain: 1, hold: 0.4, start: 0, duration: null, seed: 1, audio: true, expression: null, out: null, idleMotion: true, reactions: true, timeline: null, speaker: null, margin: 0.1, halfEyes: true, overlays: [], overlayFade: 0.3 };
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -58,6 +62,18 @@ function parseArgs(argv) {
     else if (a === '--timeline') opts.timeline = value();
     else if (a === '--speaker') opts.speaker = value();
     else if (a === '--margin') opts.margin = num(0);
+    else if (a === '--overlay-fade') opts.overlayFade = num(0);
+    else if (a === '--overlay') {
+      const spec = value(), colon = spec.indexOf(':');
+      const name = colon < 0 ? spec : spec.slice(0, colon);
+      const ranges = colon < 0 ? [[0, 1e9]] : spec.slice(colon + 1).split(',').map(part => {
+        const m = /^\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*$/.exec(part);
+        if (!m || Number(m[2]) <= Number(m[1])) throw new Error(`--overlay ${spec}: expected <name>:<start>-<end>[,<start>-<end>...] in seconds`);
+        return [Number(m[1]), Number(m[2])];
+      });
+      if (!name) throw new Error('--overlay needs an overlay name');
+      opts.overlays.push({ name, ranges });
+    }
     else if (a.startsWith('--')) throw new Error(`unknown option ${a}`);
     else rest.push(a);
   }
@@ -131,6 +147,16 @@ async function main() {
     const sprites = JSON.parse(await readFile(resolve(built, 'sprites/sprites.json'), 'utf8'));
     await Promise.all(Object.keys(sprites.layers).map(name => asset(`sprites/${name}.png`)));
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (opts.overlays.length) {
+    let sheet;
+    try { sheet = JSON.parse(await readFile(resolve(built, 'overlays/overlays.json'), 'utf8')); }
+    catch (error) { if (error.code === 'ENOENT') throw new Error(`--overlay: ${basename(project)} has no overlay layers (built/overlays/overlays.json)`); throw error; }
+    const known = sheet.overlays.map(item => item.name);
+    for (const { name } of opts.overlays) if (!known.includes(name)) throw new Error(`--overlay: unknown overlay "${name}" (found: ${known.join(', ')})`);
+    await asset('overlays/overlays.json');
+    await Promise.all(sheet.overlays.map(item => asset(`overlays/${item.file}`)));
+    for (const { name, ranges } of opts.overlays) console.log(`Overlay ${name}: ${ranges.map(([a, b]) => b >= 1e9 ? 'whole video' : `${a}-${b} s`).join(', ')}`);
+  }
 
   const server = await createServer({ root, configFile: false, publicDir: false, appType: 'custom', cacheDir: 'node_modules/.vite-pose-review', optimizeDeps: { noDiscovery: true, entries: [] },
     plugins: [{ name: 'lipsync-render-page', configureServer(server) {
@@ -195,7 +221,20 @@ async function main() {
       av.setAutoIdle(opts.idleMotion); av.setAutoMotion(opts.reactions);
       if (opts.expression) av.setExpression(opts.expression);
       av.advance(1, 60); // settle hair physics before the first frame
-      window.__render = { av, canvas, levels, speaking };
+      // Overlay opacity per frame: fades in at the start of each range and out at its end.
+      const smooth = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+      const overlayAlpha = opts.overlays.map(({ name, ranges }) => {
+        const values = new Float32Array(frames);
+        for (let f = 0; f < frames; f++) {
+          const t = start + f / opts.fps, fade = Math.max(1e-6, opts.overlayFade);
+          for (const [a, b] of ranges) {
+            if (t < a || t > b) continue;
+            values[f] = Math.max(values[f], Math.min(a <= start ? 1 : smooth((t - a) / fade), b >= 1e9 ? 1 : smooth((b - t) / fade)));
+          }
+        }
+        return { name, values };
+      });
+      window.__render = { av, canvas, levels, speaking, overlayAlpha };
       return { frames, seconds: length, start, rate, voiced: speaking.reduce((a, b) => a + b, 0) / frames };
     }, { rig, assets, opts, lipSync, segments });
     if (browserErrors.length) throw new Error(browserErrors.join('\n'));
@@ -213,9 +252,10 @@ async function main() {
     const batch = 30, started = Date.now();
     for (let f = 0; f < frames; f += batch) {
       const pngs = await page.evaluate(({ from, to, fps }) => {
-        const { av, canvas, levels, speaking } = window.__render, outFrames = [];
+        const { av, canvas, levels, speaking, overlayAlpha } = window.__render, outFrames = [];
         for (let i = from; i < to; i++) {
           av.setSpeaking(!!speaking[i]); av.setVoiceLevel(speaking[i] ? levels[i] : 0);
+          for (const { name, values } of overlayAlpha) av.setOverlayOpacity(name, values[i]);
           av.advance(1 / fps, fps * 2); // two physics steps per frame
           outFrames.push(canvas.toDataURL('image/png').split(',')[1]);
         }
