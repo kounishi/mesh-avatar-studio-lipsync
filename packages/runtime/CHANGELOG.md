@@ -1,5 +1,13 @@
 # mesh-avatar
 
+## 0.5.0
+
+### Minor Changes
+
+- 3e26ca7: Add `setIdleGain(gain)` to scale the head and body movement while idling (wandering and idle motions). The default of 1 keeps the current movement.
+- 7d898a7: Add the `halfEyes: false` option to `createMeshAvatar` to show eyes only open or closed, never half-closed.
+- caf2891: Add `setOverlayOpacity(name, opacity)` to show one overlay layer at a given opacity, for fading it in and out.
+
 ## 0.4.0
 
 ### Minor Changes

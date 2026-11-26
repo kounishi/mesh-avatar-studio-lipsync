@@ -1,5 +1,14 @@
 # mesh-avatar-element
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [3e26ca7]
+- Updated dependencies [7d898a7]
+- Updated dependencies [caf2891]
+  - mesh-avatar@0.5.0
+
 ## 0.3.0
 
 ### Minor Changes
