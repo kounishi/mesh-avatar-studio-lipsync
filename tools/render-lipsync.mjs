@@ -42,11 +42,11 @@ const USAGE = `Usage: npm run render-lipsync -- <project> <audio> [options]
                       play a gesture during these audio times: the overlays <name>_1, <name>_2,
                       ... and finally <name> appear one after another (the arm rises), <name>
                       is held, and they go back in reverse order before <end>; repeatable
-  --gesture-move <sec>  time to raise the arm through all steps (default 0.5; lowering takes
+  --gesture-move <sec>  time to raise the arm through all steps (default 0.6; lowering takes
                       80% of it)`;
 
 function parseArgs(argv) {
-  const opts = { format: 'prores', size: 1080, fps: 30, gain: 1, hold: 0.4, start: 0, duration: null, seed: 1, audio: true, expression: null, out: null, idleMotion: true, reactions: true, timeline: null, speaker: null, margin: 0.1, halfEyes: true, overlays: [], overlayFade: 0.3, idleGain: 1, gestures: [], gestureMove: 0.5 };
+  const opts = { format: 'prores', size: 1080, fps: 30, gain: 1, hold: 0.4, start: 0, duration: null, seed: 1, audio: true, expression: null, out: null, idleMotion: true, reactions: true, timeline: null, speaker: null, margin: 0.1, halfEyes: true, overlays: [], overlayFade: 0.3, idleGain: 1, gestures: [], gestureMove: 0.6 };
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -255,7 +255,8 @@ async function main() {
             if (t < a || t > b) continue;
             if (stage) {
               const rise = Math.min(opts.gestureMove, (b - a) / 2), fall = Math.min(opts.gestureMove * 0.8, (b - a) / 2);
-              const p = stages * Math.min(a <= start ? 1 : Math.min(1, (t - a) / rise), Math.min(1, (b - t) / fall));
+              // eased, so the arm starts and stops slowly (more frames per drawing at the ends)
+              const p = stages * smooth(Math.min(a <= start ? 1 : (t - a) / rise, (b - t) / fall));
               values[f] = Math.max(values[f], stepAlpha(p, stage, stages));
             } else {
               values[f] = Math.max(values[f], Math.min(a <= start ? 1 : smooth((t - a) / fade), b >= 1e9 ? 1 : smooth((b - t) / fade)));
